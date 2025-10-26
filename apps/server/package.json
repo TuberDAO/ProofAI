@@ -1,0 +1,40 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Backend server for PrivateGPT on MegaETH",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "preflight": "tsx scripts/preflight.ts",
+    "smoke": "tsx scripts/smoke-job.ts",
+    "smoke:client": "tsx scripts/smoke-client.ts",
+    "check:wallet": "tsx scripts/check-wallet.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^8.5.0",
+    "@fastify/rate-limit": "^9.1.0",
+    "@tanstack/react-query": "^5.90.5",
+    "connectkit": "^1.9.1",
+    "dotenv": "^16.4.1",
+    "fastify": "^4.25.2",
+    "git-rev-sync": "^3.0.2",
+    "viem": "^2.38.4",
+    "wagmi": "^2.18.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/git-rev-sync": "^2.0.2",
+    "@types/node": "^20.11.10",
+    "@vitest/ui": "^1.2.2",
+    "pino-pretty": "^10.3.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.7.2",
+    "vitest": "^1.2.2"
+  }
+}

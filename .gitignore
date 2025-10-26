@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+build/
+dist/
+.next/
+out/
+
+# Misc
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment - exclude ALL env files and key files
+# BUT allow .env.example files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.key
+*.pem
+
+# Allow .env.example files
+!.env.example
+!**/.env.example
+!**/env.example
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Foundry
+cache/
+out/
+broadcast/
+
+# TypeScript
+*.tsbuildinfo
+

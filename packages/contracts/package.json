@@ -1,0 +1,25 @@
+{
+  "name": "contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for PrivateGPT on MegaETH",
+  "scripts": {
+    "compile": "forge build",
+    "hh:compile": "hardhat compile",
+    "hh:deploy:megaeth": "hardhat run --network megaeth scripts/deploy.ts",
+    "hh:deploy:megaeth:v2": "hardhat run --network megaeth scripts/deploy-v2.ts",
+    "smart-deploy": "node scripts/smart-deploy.mjs",
+    "test": "forge test -vvv",
+    "typecheck": "echo \"Contracts use Solidity; no TS typecheck needed\"",
+    "deploy:testnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url $MEGAETH_RPC_URL --private-key $DEPLOYER_PRIVATE_KEY --broadcast",
+    "clean": "forge clean"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^20.19.23",
+    "dotenv": "^16.6.1",
+    "ethers": "^6.13.0",
+    "hardhat": "^2.22.18",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

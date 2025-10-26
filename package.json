@@ -1,0 +1,46 @@
+{
+  "name": "privategpt-megaeth",
+  "version": "1.0.0",
+  "description": "PrivateGPT on MegaETH - MVP",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm server:dev\" \"pnpm web:dev\"",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "test": "pnpm -r test",
+    "contracts:compile": "pnpm --filter contracts run hh:compile",
+    "contracts:deploy:megaeth": "pnpm --filter contracts run hh:deploy:megaeth",
+    "contracts:full-deploy": "pnpm contracts:compile && pnpm contracts:deploy:megaeth",
+    "contracts:test": "pnpm --filter contracts test",
+    "contracts:deploy:testnet": "pnpm --filter contracts deploy:testnet",
+    "smart-deploy": "pnpm --filter contracts run smart-deploy",
+    "server:dev": "pnpm --filter server dev",
+    "server:typecheck": "pnpm --filter server typecheck",
+    "server:preflight": "pnpm --filter server run preflight",
+    "server:smoke": "pnpm --filter server run smoke",
+    "server:smoke:client": "pnpm --filter server run smoke:client",
+    "server:check:wallet": "pnpm --filter server run check:wallet",
+    "server:test": "pnpm --filter server test",
+    "contracts:deploy:megaeth:v2": "pnpm --filter contracts run hh:deploy:megaeth:v2",
+    "web:dev": "pnpm --filter web dev",
+    "web:typecheck": "pnpm --filter web typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.10",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
+
