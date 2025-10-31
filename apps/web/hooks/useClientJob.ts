@@ -1,3 +1,5 @@
+'use client';
+
 import { useSignMessage, useAccount } from 'wagmi';
 import { keccak256, toBytes, type Hex } from 'viem';
 

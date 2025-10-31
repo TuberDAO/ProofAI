@@ -21,6 +21,29 @@ export interface ClientJobRequest {
   domain: string;
 }
 
+export interface PvaSessionParams {
+  chainId: number;
+  contract: string;
+  submitter: string;
+  expiry: number;
+  nonce: string;
+}
+
+export interface SessionCreateRequest {
+  submitter: string;
+  signature: string;
+  message: string;
+  chainId: number;
+  contract: string;
+  expiry: number;
+  nonce: string;
+  policy?: {
+    maxPrompts?: number;
+    maxGasWei?: string;
+    allowedModels?: string[];
+  };
+}
+
 /**
  * Build the strict PVA::JOB message format (6 lines, exact format)
  */
@@ -31,6 +54,18 @@ contract:${params.contract}
 submitter:${params.submitter}
 payloadHash:${params.payloadHash}
 timestamp:${params.timestamp}`;
+}
+
+/**
+ * Build the strict PVA::SESSION message format (6 lines, exact format)
+ */
+export function buildPvaSessionMessage(params: PvaSessionParams): string {
+  return `PVA::SESSION
+chainId:${params.chainId}
+contract:${params.contract}
+submitter:${params.submitter}
+expiry:${params.expiry}
+nonce:${params.nonce}`;
 }
 
 /**
@@ -67,8 +102,8 @@ export async function verifyClientSignature(input: ClientJobRequest): Promise<{
     );
   }
 
-  // 4. Validate chainId if env-bound
-  const expectedChainId = env.chainId || 6342;
+  // 4. Validate chainId (MegaETH testnet is always 6342)
+  const expectedChainId = 6342;
   if (input.chainId !== expectedChainId) {
     throw new Error(
       `Invalid chainId: expected ${expectedChainId}, got ${input.chainId}`
@@ -115,5 +150,90 @@ export async function verifyClientSignature(input: ClientJobRequest): Promise<{
   return {
     ok: true,
     submitter: recoveredSigner,
+  };
+}
+
+/**
+ * Verify a PVA::SESSION signature
+ * @throws Error with precise validation failure message
+ */
+export async function verifySessionSignature(input: SessionCreateRequest): Promise<{
+  ok: true;
+  submitter: string;
+  sessionId: string;
+}> {
+  // 1. Validate expiry is in the future (with 2 min clock skew tolerance)
+  const now = Math.floor(Date.now() / 1000);
+  const twoMinutes = 2 * 60;
+  
+  if (input.expiry <= now - twoMinutes) {
+    throw new Error(`Session expiry is in the past: ${input.expiry} (now: ${now})`);
+  }
+
+  // 2. Validate expiry is not too far in the future (max 30 minutes)
+  const maxExpiry = now + (env.sessionMaxMinutes * 60);
+  if (input.expiry > maxExpiry) {
+    throw new Error(
+      `Session expiry too far in future: ${input.expiry} (max: ${maxExpiry})`
+    );
+  }
+
+  // 3. Validate chainId
+  const expectedChainId = 6342;
+  if (input.chainId !== expectedChainId) {
+    throw new Error(
+      `Invalid chainId: expected ${expectedChainId}, got ${input.chainId}`
+    );
+  }
+
+  // 4. Validate contract
+  const expectedContract = (
+    env.jobRegistryV2Address || env.jobRegistryAddress
+  ).toLowerCase();
+  if (input.contract.toLowerCase() !== expectedContract) {
+    throw new Error(
+      `Invalid contract: expected ${expectedContract}, got ${input.contract}`
+    );
+  }
+
+  // 5. Rebuild the exact message
+  const expectedMessage = buildPvaSessionMessage({
+    chainId: input.chainId,
+    contract: input.contract,
+    submitter: input.submitter,
+    expiry: input.expiry,
+    nonce: input.nonce,
+  });
+
+  if (input.message !== expectedMessage) {
+    throw new Error(`Message mismatch: expected\n${expectedMessage}\ngot\n${input.message}`);
+  }
+
+  // 6. Recover signer via EIP-191 personal_sign
+  let recoveredSigner: string;
+  try {
+    recoveredSigner = await recoverMessageAddress({
+      message: input.message,
+      signature: input.signature as Hex,
+    });
+  } catch (error) {
+    throw new Error(`Failed to recover signer: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+
+  // 7. Verify signer matches submitter
+  if (recoveredSigner.toLowerCase() !== input.submitter.toLowerCase()) {
+    throw new Error(
+      `Signature verification failed: signer ${recoveredSigner} does not match submitter ${input.submitter}`
+    );
+  }
+
+  // 8. Compute sessionId = keccak256(submitter || expiry || nonce)
+  const sessionData = `${input.submitter}${input.expiry}${input.nonce}`;
+  const sessionId = keccak256(toBytes(sessionData));
+
+  return {
+    ok: true,
+    submitter: recoveredSigner,
+    sessionId,
   };
 }

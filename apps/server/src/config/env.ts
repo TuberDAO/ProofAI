@@ -177,6 +177,35 @@ export const env = {
     10
   ),
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '60', 10),
+  sessionMaxMinutes: parseInt(process.env.SESSION_MAX_MINUTES || '30', 10),
+  sessionDefaultMinutes: parseInt(process.env.SESSION_DEFAULT_MINUTES || '15', 10),
+  rateLimitBurst: parseInt(process.env.RATE_LIMIT_BURST || '10', 10),
+  redisUrl: process.env.REDIS_URL?.trim() || '',
+  
+  // Security hardening (Phase 1)
+  maxPromptChars: parseInt(process.env.MAX_PROMPT_CHARS || '10000', 10),
+  maxReqsPerMinute: parseInt(process.env.MAX_REQS_PER_MINUTE || '120', 10),
+  maxJobsPerMinute: parseInt(process.env.MAX_JOBS_PER_MINUTE || '30', 10),
+  originAllowlist: (process.env.ORIGIN_ALLOWLIST || 'http://localhost:3000')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+  allowedModels: (process.env.ALLOWED_MODELS || 'llama-3-8b-instruct')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+  allowedChainIds: (process.env.ALLOWED_CHAIN_IDS || '6342')
+    .split(',')
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n)),
+  allowedContracts: (
+    process.env.ALLOWED_CONTRACTS ||
+    validated.registryV2Address ||
+    validated.registryAddress
+  )
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
 };
 
 /**
@@ -190,6 +219,20 @@ if (isNaN(minEth) || isNaN(maxEth) || minEth <= 0 || maxEth <= minEth) {
   );
 }
 
+/**
+ * Helper: check if chainId is allowed
+ */
+export function isAllowedChainId(chainId: number): boolean {
+  return env.allowedChainIds.includes(chainId);
+}
+
+/**
+ * Helper: check if contract is allowed
+ */
+export function isAllowedContract(contract: string): boolean {
+  return env.allowedContracts.includes(contract.toLowerCase());
+}
+
 // Log success (no secrets)
 console.log('✅ Environment validated successfully');
 console.log(`   RPC: ${env.megaethRpcUrl}`);
@@ -201,4 +244,5 @@ if (env.jobRegistryV2Address) {
 if (env.signingMode === 'server') {
   console.log(`   Provider: ${env.providerAddress}`);
 }
+console.log(`   Security: ${env.allowedChainIds.length} chain(s), ${env.allowedContracts.length} contract(s), ${env.allowedModels.length} model(s)`);
 

@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import { env } from './config/env.js';
 import { healthRoutes } from './routes/health.js';
 import { jobRoutes } from './routes/jobs.js';
+import { sessionRoutes } from './routes/sessions.js';
 
 // Create Fastify instance with secure logging
 const fastify = Fastify({
@@ -46,6 +47,7 @@ fastify.register(cors, {
 // Register routes
 fastify.register(healthRoutes);
 fastify.register(jobRoutes);
+fastify.register(sessionRoutes);
 
 // Start server
 const start = async () => {

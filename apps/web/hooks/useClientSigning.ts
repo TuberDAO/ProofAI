@@ -1,3 +1,5 @@
+'use client';
+
 import { useSignMessage, useAccount } from 'wagmi';
 import { buildArtifactFromPrompt } from '../lib/attestation';
 import type { Hex } from 'viem';

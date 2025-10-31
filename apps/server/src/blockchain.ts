@@ -73,16 +73,19 @@ const jobRegistryV2Abi = [
 let account: ReturnType<typeof privateKeyToAccount> | undefined;
 let walletClient: ReturnType<typeof createWalletClient> | undefined;
 
-// Only create wallet client in server mode (when we have a private key)
-if (env.signingMode === 'server' && env.serverWalletPrivateKey) {
+// Initialize wallet client in both modes (server always pays gas)
+// In client mode, user signs the job data but server still pays for the tx
+if (env.serverWalletPrivateKey) {
   account = privateKeyToAccount(env.serverWalletPrivateKey);
   walletClient = createWalletClient({
     account,
     transport: http(env.megaethRpcUrl),
   });
 } else if (env.signingMode === 'server') {
+  // Only throw error if in server mode and missing key
   throw new Error('SERVER_WALLET_PRIVATE_KEY required in server signing mode');
 }
+// Note: In client mode, wallet is optional for dev/testing (will fail on actual submission)
 
 const publicClient = createPublicClient({
   transport: http(env.megaethRpcUrl),
@@ -103,6 +106,7 @@ export interface JobSubmissionResult {
   jobId: bigint;
   attestationHash: Hash;
   txHash: Hash;
+  receiptHash?: Hash;
 }
 
 /**
@@ -151,7 +155,7 @@ async function submitJobV1(
     }
   }
 
-  return { jobId, attestationHash, txHash };
+  return { jobId, attestationHash, txHash, receiptHash: receipt.blockHash };
 }
 
 /**
@@ -202,7 +206,7 @@ async function submitJobV2(
     }
   }
 
-  return { jobId, attestationHash, txHash };
+  return { jobId, attestationHash, txHash, receiptHash: receipt.blockHash };
 }
 
 /**

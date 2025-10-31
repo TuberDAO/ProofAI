@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ConnectKitButton } from 'connectkit';
+import { useSignMessage, useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useClientJob } from '../hooks/useClientJob';
+import { SessionClient } from '../lib/session';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 const EXPLORER_URL =
   process.env.NEXT_PUBLIC_EXPLORER_BASE_URL ||
   'https://www.oklink.com/megaeth-testnet';
-const SIGNING_MODE = process.env.NEXT_PUBLIC_SIGNING_MODE || 'server';
 
 interface ArtifactPreview {
   model: string;
@@ -24,9 +24,14 @@ interface JobResult {
   jobId: string;
   attestationHash: string;
   txHash: string;
-  signingMode: 'server' | 'client';
+  receiptHash?: string | null;
+  signingMode: 'server' | 'client' | 'session';
   signer?: string;
-  artifactPreview: ArtifactPreview;
+  submitter?: string;
+  sessionId?: string;
+  promptsUsed?: number;
+  artifactPreview?: ArtifactPreview;
+  payloadHash?: string;
 }
 
 interface HealthStatus {
@@ -34,42 +39,224 @@ interface HealthStatus {
   chainId: number;
 }
 
+interface ServerMode {
+  signingMode: 'server' | 'client';
+  contractV1: string;
+  contractV2: string | null;
+  chainId: number;
+}
+
+function WalletButton() {
+  const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
+
+  if (isConnected && address) {
+    return (
+      <button
+        onClick={() => disconnect()}
+        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+      >
+        {address.slice(0, 6)}...{address.slice(-4)}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => {
+        const connector = connectors[0];
+        if (connector) connect({ connector });
+      }}
+      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+    >
+      Connect Wallet
+    </button>
+  );
+}
+
 export default function Home() {
   const [input, setInput] = useState('');
-  const [amountEth, setAmountEth] = useState('0.0001');
+  const [amountEth, setAmountEth] = useState('0.00001');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<JobResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [serverMode, setServerMode] = useState<ServerMode | null>(null);
+
+  // Session state
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionRemaining, setSessionRemaining] = useState('00:00');
+  const [autoRenew, setAutoRenew] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(false);
 
   const { submitClientJob, address, isConnected } = useClientJob();
+  const { signMessageAsync } = useSignMessage();
 
-  // Fetch health status on mount
+  // Fetch health status and server mode on mount
   useEffect(() => {
     fetch(`${API_BASE_URL}/health`)
       .then((res) => res.json())
       .then((data) => setHealth(data))
       .catch(() => setHealth(null));
+
+    fetch(`${API_BASE_URL}/jobs/mode`)
+      .then((res) => res.json())
+      .then((data) => setServerMode(data))
+      .catch(() => setServerMode(null));
   }, []);
+
+  // Handle session renewal (for auto-renew)
+  const handleRenewSession = async () => {
+    if (!isConnected || !address || sessionLoading) return;
+
+    setSessionLoading(true);
+
+    try {
+      await SessionClient.start({
+        signMessage: async (message) => {
+          return await signMessageAsync({ message });
+        },
+        address,
+        minutes: 15,
+      });
+
+      console.log('[Page] Session renewed');
+    } catch (err) {
+      console.error('[Page] Failed to renew session:', err);
+      setAutoRenew(false);
+    } finally {
+      setSessionLoading(false);
+    }
+  };
+
+  // Session countdown timer
+  useEffect(() => {
+    const checkSession = () => {
+      const session = SessionClient.get();
+      const active = !!session && SessionClient.remaining() > 0;
+      setSessionActive(active);
+      
+      if (active) {
+        setSessionRemaining(SessionClient.formatRemaining());
+        
+        if (autoRenew && SessionClient.shouldRenew() && !sessionLoading) {
+          handleRenewSession();
+        }
+      } else {
+        setSessionRemaining('00:00');
+      }
+    };
+
+    checkSession();
+    const interval = setInterval(checkSession, 1000);
+
+    const unsubscribe = SessionClient.on((event) => {
+      if (event === 'expired') {
+        setError('Session expired. Please start a new session or submit with wallet signature.');
+      } else if (event === 'cleared') {
+        setSessionActive(false);
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRenew, sessionLoading]);
+
+  // Handle session start
+  const handleStartSession = async () => {
+    if (!isConnected || !address) {
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    setSessionLoading(true);
+    setError(null);
+
+    try {
+      await SessionClient.start({
+        signMessage: async (message) => {
+          return await signMessageAsync({ message });
+        },
+        address,
+        minutes: 15,
+      });
+
+      setSessionActive(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start session');
+    } finally {
+      setSessionLoading(false);
+    }
+  };
+
+  // Handle session end
+  const handleEndSession = () => {
+    SessionClient.end();
+    setSessionActive(false);
+    setAutoRenew(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setErrorDetails(null);
     setResult(null);
 
     try {
       let data;
+      const signingMode = serverMode?.signingMode || 'server';
 
-      // CLIENT MODE: Sign with wallet
-      if (SIGNING_MODE === 'client') {
+      // Check for active session first (highest priority)
+      if (sessionActive && SessionClient.get()) {
+        console.log('[Page] Submitting with session');
+        
+        const headers = SessionClient.attach({
+          'Content-Type': 'application/json',
+        });
+
+        const response = await fetch(`${API_BASE_URL}/jobs`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: 'llama-3-8b-instruct',
+            input: input,
+            amountEth: amountEth,
+          }),
+        });
+
+        data = await response.json();
+
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403 || response.status === 429) {
+            SessionClient.end();
+            setSessionActive(false);
+          }
+          if (response.status === 400) {
+            setErrorDetails(data);
+          }
+          throw new Error(
+            data.details
+              ? Array.isArray(data.details)
+                ? data.details.join('; ')
+                : data.details
+              : data.error || 'Failed to submit job'
+          );
+        }
+      } else if (signingMode === 'client') {
+        // CLIENT MODE: Use wallet signature
         if (!isConnected) {
           throw new Error('Please connect your wallet first');
         }
-        // Submit client-signed job with new format
+
+        console.log('[Page] Submitting with wallet signature');
         data = await submitClientJob({
-          model: 'llama3-instruct',
+          model: 'llama-3-8b-instruct',
           input: input,
         });
       } else {
@@ -79,18 +266,30 @@ export default function Home() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ prompt: input, amountEth }),
+          body: JSON.stringify({ 
+            prompt: input, 
+            amountEth: amountEth 
+          }),
         });
 
         data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.details || data.error || 'Failed to submit job');
+          if (response.status === 400) {
+            setErrorDetails(data);
+          }
+          throw new Error(
+            data.details
+              ? Array.isArray(data.details)
+                ? data.details.join('; ')
+                : data.details
+              : data.error || 'Failed to submit job'
+          );
         }
       }
 
       setResult(data);
-      setInput(''); // Clear input after successful submission
+      setInput('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
     } finally {
@@ -101,7 +300,9 @@ export default function Home() {
   const isSubmitDisabled =
     loading ||
     !input.trim() ||
-    (SIGNING_MODE === 'client' && !isConnected);
+    (serverMode?.signingMode === 'client' && !isConnected && !sessionActive);
+
+  const signingMode = serverMode?.signingMode || 'server';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900">
@@ -115,7 +316,7 @@ export default function Home() {
           </p>
 
           {/* Dev Mode Banner */}
-          {SIGNING_MODE === 'server' && (
+          {signingMode === 'server' && (
             <div className="mb-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg text-sm">
               <span className="text-yellow-800 dark:text-yellow-200 font-medium">
                 ⚠️ Dev mode: Server is signing on your behalf. Not for production.
@@ -130,8 +331,8 @@ export default function Home() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-green-800 dark:text-green-200 font-medium">
                   MegaETH (6342) — Ready
-                  {SIGNING_MODE === 'client' && ' (client-signed)'}
-                  {SIGNING_MODE === 'server' && ' (server-signed)'}
+                  {signingMode === 'client' && ' (client-signed)'}
+                  {signingMode === 'server' && ' (server-signed)'}
                 </span>
               </div>
             ) : health ? (
@@ -151,13 +352,13 @@ export default function Home() {
             )}
 
             {/* Show Connect Wallet button in client mode */}
-            {SIGNING_MODE === 'client' && (
-              <ConnectKitButton />
+            {signingMode === 'client' && (
+              <WalletButton />
             )}
           </div>
 
           {/* Privacy Notice for Client Mode */}
-          {SIGNING_MODE === 'client' && isConnected && (
+          {signingMode === 'client' && isConnected && (
             <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg text-sm">
               <span className="text-blue-800 dark:text-blue-200">
                 🔒 Data never leaves your device unencrypted. Job is signed by your wallet.
@@ -167,6 +368,76 @@ export default function Home() {
         </header>
 
         <main className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8">
+          {/* Session Controls */}
+          {signingMode === 'client' && isConnected && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Session badge */}
+                  {sessionActive ? (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-green-800 dark:text-green-200 font-medium">
+                        Session active ({sessionRemaining})
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-full text-sm">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <span className="text-gray-600 dark:text-gray-400 font-medium">
+                        No session
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Auto-renew checkbox */}
+                  {sessionActive && (
+                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoRenew}
+                        onChange={(e) => setAutoRenew(e.target.checked)}
+                        className="rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
+                      />
+                      Auto-renew
+                    </label>
+                  )}
+                </div>
+
+                {/* Start/End buttons */}
+                <div className="flex gap-2">
+                  {!sessionActive ? (
+                    <button
+                      type="button"
+                      onClick={handleStartSession}
+                      disabled={sessionLoading || !isConnected}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      {sessionLoading ? 'Starting...' : 'Start 15-min secure session'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleEndSession}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      End session
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Info text */}
+              <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+                {sessionActive ? (
+                  <>🔑 Session active: Submit multiple prompts without wallet popups. Session expires in {sessionRemaining}.</>
+                ) : (
+                  <>🔐 Start a session to sign once and submit multiple prompts (15 min window).</>
+                )}
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label
@@ -186,7 +457,7 @@ export default function Home() {
                 disabled={loading}
               />
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Max 8,000 characters. Your prompt is hashed before submission.
+                Max 10,000 characters. Your prompt is hashed before submission.
               </p>
             </div>
 
@@ -244,12 +515,16 @@ export default function Home() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  {SIGNING_MODE === 'client' ? 'Signing & Submitting...' : 'Submitting...'}
+                  {signingMode === 'client' 
+                    ? (sessionActive ? 'Submitting...' : 'Signing & Submitting...') 
+                    : 'Submitting...'}
                 </span>
-              ) : SIGNING_MODE === 'client' && !isConnected ? (
+              ) : signingMode === 'client' && !isConnected && !sessionActive ? (
                 '🔒 Connect Wallet to Submit'
+              ) : sessionActive ? (
+                '🚀 Submit (session)'
               ) : (
-                `🚀 ${SIGNING_MODE === 'client' ? 'Sign & ' : ''}Run Private AI`
+                `🚀 ${signingMode === 'client' ? 'Submit (client-signed)' : 'Run Private AI'}`
               )}
             </button>
           </form>
@@ -260,6 +535,16 @@ export default function Home() {
               <p className="text-red-800 dark:text-red-200 font-medium">
                 ❌ Error: {error}
               </p>
+              {errorDetails && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-red-700 dark:text-red-300 text-sm">
+                    Show error details
+                  </summary>
+                  <pre className="mt-2 text-xs bg-red-50 dark:bg-red-950 p-2 rounded overflow-x-auto">
+                    {JSON.stringify(errorDetails, null, 2)}
+                  </pre>
+                </details>
+              )}
             </div>
           )}
 
@@ -289,13 +574,36 @@ export default function Home() {
                   </span>
                 </div>
 
-                {result.signer && (
+                <div>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    Signing Mode:
+                  </span>
+                  <span className="ml-2 text-gray-900 dark:text-white font-mono text-sm">
+                    {result.signingMode}
+                    {result.signingMode === 'session' && result.promptsUsed && (
+                      <span className="text-gray-600 dark:text-gray-400"> (prompt #{result.promptsUsed})</span>
+                    )}
+                  </span>
+                </div>
+
+                {(result.signer || result.submitter) && (
                   <div>
                     <span className="font-medium text-gray-700 dark:text-gray-300">
-                      Signed by:
+                      {result.signingMode === 'session' ? 'Session owner:' : 'Signed by:'}
                     </span>
                     <span className="ml-2 text-gray-900 dark:text-white font-mono text-sm">
-                      {result.signer}
+                      {result.signer || result.submitter}
+                    </span>
+                  </div>
+                )}
+
+                {result.receiptHash && (
+                  <div>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                      Receipt Hash:
+                    </span>
+                    <span className="ml-2 text-gray-900 dark:text-white font-mono text-sm break-all">
+                      {result.receiptHash}
                     </span>
                   </div>
                 )}
@@ -310,7 +618,7 @@ export default function Home() {
                     rel="noopener noreferrer"
                     className="ml-2 text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm"
                   >
-                    View on MegaETH Explorer →
+                    {result.txHash.substring(0, 10)}...{result.txHash.substring(result.txHash.length - 8)} →
                   </a>
                 </div>
               </div>
@@ -338,7 +646,7 @@ export default function Home() {
           <p>
             Powered by MegaETH Testnet • Privacy-first AI • On-chain Attestation
           </p>
-          {SIGNING_MODE === 'client' && (
+          {signingMode === 'client' && (
             <p className="mt-1">
               🔐 Client-signed mode: Your wallet, your control
             </p>
