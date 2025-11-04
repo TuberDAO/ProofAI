@@ -4,10 +4,10 @@
   "description": "Backend server for PrivateGPT on MegaETH",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -15,6 +15,7 @@
     "smoke": "tsx scripts/smoke-job.ts",
     "smoke:client": "tsx scripts/smoke-client.ts",
     "smoke:session": "tsx scripts/session-smoke.ts",
+    "smoke:docker": "node dist/scripts/session-smoke.js || tsx scripts/session-smoke.ts",
     "check:wallet": "tsx scripts/check-wallet.ts",
     "audit:tail": "Get-Content -Path .\\dist\\audit.log -Wait"
   },
@@ -26,12 +27,14 @@
     "dotenv": "^16.4.1",
     "fastify": "^4.25.2",
     "git-rev-sync": "^3.0.2",
+    "ioredis": "^5.4.1",
     "viem": "^2.38.4",
     "wagmi": "^2.18.2",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/git-rev-sync": "^2.0.2",
+    "@types/ioredis": "^5.0.0",
     "@types/node": "^20.11.10",
     "@vitest/ui": "^1.2.2",
     "pino-pretty": "^10.3.1",
