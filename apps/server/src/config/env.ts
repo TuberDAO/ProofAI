@@ -94,17 +94,19 @@ function validateEnv() {
     }
   }
 
-  // Validate JOB_REGISTRY_ADDRESS
-  if (!registryAddress) {
-    errors.push('JOB_REGISTRY_ADDRESS is required');
-  } else if (!PATTERNS.ADDRESS.test(registryAddress)) {
-    errors.push(
-      'JOB_REGISTRY_ADDRESS must be a valid Ethereum address (0x + 40 hex characters)'
-    );
+  // Validate JOB_REGISTRY_ADDRESS (only required in server mode)
+  if (signingMode === 'server') {
+    if (!registryAddress) {
+      errors.push('JOB_REGISTRY_ADDRESS is required in server signing mode');
+    } else if (!PATTERNS.ADDRESS.test(registryAddress)) {
+      errors.push(
+        'JOB_REGISTRY_ADDRESS must be a valid Ethereum address (0x + 40 hex characters)'
+      );
+    }
   }
 
-  // Validate MEGAETH_RPC_URL
-  if (!PATTERNS.RPC_URL.test(rpcUrl)) {
+  // Validate MEGAETH_RPC_URL (only required in server mode)
+  if (signingMode === 'server' && !PATTERNS.RPC_URL.test(rpcUrl)) {
     errors.push('MEGAETH_RPC_URL must be a valid HTTP(S) URL');
   }
 

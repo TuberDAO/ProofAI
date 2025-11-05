@@ -5,19 +5,34 @@ import { env } from './config/env.js';
 import { healthRoutes } from './routes/health.js';
 import { jobRoutes } from './routes/jobs.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { redis } from './storage/redis.js';
+
+// Check if pino-pretty is available (only in dev with devDependencies)
+let usePrettyLogs = false;
+if (process.env.NODE_ENV === 'development') {
+  try {
+    require.resolve('pino-pretty');
+    usePrettyLogs = true;
+  } catch {
+    // pino-pretty not available, use standard JSON logs
+  }
+}
 
 // Create Fastify instance with secure logging
 const fastify = Fastify({
   logger: {
     level: 'info',
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
+    // Only use pino-pretty if available
+    ...(usePrettyLogs && {
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'HH:MM:ss Z',
+          ignore: 'pid,hostname',
+        },
       },
-    },
+    }),
     // Redact sensitive fields from logs
     redact: {
       paths: [
@@ -52,6 +67,10 @@ fastify.register(sessionRoutes);
 // Start server
 const start = async () => {
   try {
+    // Check Redis connection
+    await redis.ping();
+    console.log('✅ Redis OK');
+
     await fastify.listen({ port: env.port, host: '0.0.0.0' });
     console.log(`\n🚀 Server running on http://localhost:${env.port}`);
   } catch (err) {

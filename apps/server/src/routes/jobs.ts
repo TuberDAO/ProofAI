@@ -16,7 +16,10 @@ import { rateLimitByIP, rateLimitBySession } from '../middleware/rateLimit.js';
 import { audit, createAuditEvent } from '../log/audit.js';
 import { getIdempotentResult, setIdempotentResult } from '../storage/idempotency.js';
 import { createJobKey, isReplay, markAsSeen } from '../storage/replay.js';
+import { verifyQuote, generatePlaceholderAttestation } from '../attestation/verify.js';
+import { anchorReceipt } from '../receipt/anchor.js';
 import type { Hex } from 'viem';
+import { keccak256, toBytes } from 'viem';
 
 /**
  * Handle job submission with session authorization
@@ -110,7 +113,7 @@ async function handleSessionJob(
     }
 
     // 4. Rate limit by session
-    const rateLimitResult = rateLimitBySession(sessionId);
+    const rateLimitResult = await rateLimitBySession(sessionId);
     if (!rateLimitResult.allowed) {
       audit(
         createAuditEvent({
@@ -203,6 +206,22 @@ async function handleSessionJob(
       session.submitter
     );
 
+    // 8. Generate TEE attestation (placeholder)
+    const placeholderQuote = generatePlaceholderAttestation(input);
+    const quoteVerification = await verifyQuote(placeholderQuote);
+
+    // 9. Create receipt and anchor it
+    const receipt = {
+      model,
+      modelVersion: '1.0.0',
+      inputHash: attestationHash,
+      timestampIso: new Date().toISOString(),
+      codeVersion: process.env.GIT_COMMIT || 'dev',
+      enclaveDigest: quoteVerification.digest,
+    };
+    const receiptHash = keccak256(toBytes(JSON.stringify(receipt)));
+    const anchor = await anchorReceipt(receiptHash);
+
     const response = {
       jobId: result.jobId.toString(),
       attestationHash: result.attestationHash,
@@ -213,6 +232,8 @@ async function handleSessionJob(
       sessionId,
       promptsUsed: newCount,
       artifactPreview: artifact,
+      enclaveDigest: quoteVerification.digest,
+      anchorTx: anchor.txHash,
     };
 
     // 8. Store idempotent result
@@ -336,6 +357,22 @@ export async function jobRoutes(fastify: FastifyInstance) {
         const { artifact, attestationHash } = buildArtifactFromPrompt(prompt);
         const result = await submitJobOnChain(attestationHash, amountEth);
 
+        // 4. Generate TEE attestation (placeholder)
+        const placeholderQuote = generatePlaceholderAttestation(prompt);
+        const quoteVerification = await verifyQuote(placeholderQuote);
+
+        // 5. Create receipt and anchor it
+        const receipt = {
+          model: 'llama-3-8b-instruct',
+          modelVersion: '1.0.0',
+          inputHash: attestationHash,
+          timestampIso: new Date().toISOString(),
+          codeVersion: process.env.GIT_COMMIT || 'dev',
+          enclaveDigest: quoteVerification.digest,
+        };
+        const receiptHash = keccak256(toBytes(JSON.stringify(receipt)));
+        const anchor = await anchorReceipt(receiptHash);
+
         const response = {
           jobId: result.jobId.toString(),
           attestationHash: result.attestationHash,
@@ -343,6 +380,8 @@ export async function jobRoutes(fastify: FastifyInstance) {
           receiptHash: result.receiptHash || null,
           signingMode: 'server' as const,
           artifactPreview: artifact,
+          enclaveDigest: quoteVerification.digest,
+          anchorTx: anchor.txHash,
         };
 
         // 4. Store idempotent result
@@ -515,6 +554,22 @@ export async function jobRoutes(fastify: FastifyInstance) {
           clientRequest.submitter as `0x${string}`
         );
 
+        // 9. Generate TEE attestation (placeholder)
+        const placeholderQuote = generatePlaceholderAttestation(clientRequest.payload.input);
+        const quoteVerification = await verifyQuote(placeholderQuote);
+
+        // 10. Create receipt and anchor it
+        const receipt = {
+          model: clientRequest.payload.model,
+          modelVersion: '1.0.0',
+          inputHash: attestationHash,
+          timestampIso: new Date().toISOString(),
+          codeVersion: process.env.GIT_COMMIT || 'dev',
+          enclaveDigest: quoteVerification.digest,
+        };
+        const receiptHash = keccak256(toBytes(JSON.stringify(receipt)));
+        const anchor = await anchorReceipt(receiptHash);
+
         const response = {
           jobId: result.jobId.toString(),
           attestationHash: result.attestationHash,
@@ -525,6 +580,8 @@ export async function jobRoutes(fastify: FastifyInstance) {
           signer: verificationResult.submitter, // Alias for backward compatibility
           artifactPreview: artifact,
           payloadHash: clientRequest.payloadHash,
+          enclaveDigest: quoteVerification.digest,
+          anchorTx: anchor.txHash,
         };
 
         // 9. Store idempotent result
