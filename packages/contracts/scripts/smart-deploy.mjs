@@ -19,7 +19,7 @@ if (!existsSync(envPath)) {
   console.error('  cp packages/contracts/env.example packages/contracts/.env');
   console.error('');
   console.error('And fill in:');
-  console.error('  MEGAETH_RPC_URL=https://carrot.megaeth.com/rpc');
+  console.error('  MEGAETH_RPC_URL=https://timothy.megaeth.com/rpc');
   console.error('  DEPLOYER_PRIVATE_KEY=your_private_key_here');
   process.exit(1);
 }

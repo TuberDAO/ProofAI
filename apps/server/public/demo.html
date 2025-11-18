@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProofAI Chat</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      height: 100vh;
+      overflow: hidden;
+      color: #333;
+    }
+    
+    /* Top status bar */
+    .status-bar {
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      padding: 0.5rem 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.8rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    
+    .status-label {
+      color: #6c757d;
+      font-weight: 500;
+    }
+    
+    .status-value {
+      font-weight: 600;
+      color: #495057;
+    }
+    
+    .status-value a {
+      color: #667eea;
+      text-decoration: none;
+    }
+    
+    .status-value a:hover {
+      text-decoration: underline;
+    }
+    
+    .status-ok {
+      color: #28a745;
+    }
+    
+    .status-error {
+      color: #dc3545;
+    }
+    
+    .status-badge {
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    
+    .badge-error {
+      background: #dc3545;
+      color: white;
+    }
+    
+    /* Main container */
+    .main-container {
+      display: flex;
+      height: calc(100vh - 45px);
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1rem;
+      gap: 1rem;
+    }
+    
+    /* Chat container */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      overflow: hidden;
+      min-width: 0;
+    }
+    
+    .chat-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 1rem 1.5rem;
+      font-size: 1.2rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    /* Message bubbles */
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 80%;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .message.user {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+    
+    .message.assistant {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+    
+    .message-bubble {
+      padding: 0.875rem 1.125rem;
+      border-radius: 18px;
+      word-wrap: break-word;
+      line-height: 1.5;
+    }
+    
+    .message.user .message-bubble {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    
+    .message.assistant .message-bubble {
+      background: #f1f3f5;
+      color: #212529;
+      border-bottom-left-radius: 4px;
+    }
+    
+    .message.assistant .message-bubble.error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    
+    .message.assistant .message-bubble.thinking {
+      background: #e7f3ff;
+      color: #1976d2;
+      font-style: italic;
+    }
+    
+    .message-metadata {
+      font-size: 0.75rem;
+      color: #6c757d;
+      margin-top: 0.375rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .message-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    
+    .badge-stub {
+      background: #ffc107;
+      color: #000;
+    }
+    
+    .badge-live {
+      background: #28a745;
+      color: white;
+    }
+    
+    .message-metadata a {
+      color: #667eea;
+      text-decoration: none;
+    }
+    
+    .message-metadata a:hover {
+      text-decoration: underline;
+    }
+    
+    .timestamp {
+      color: #adb5bd;
+      font-size: 0.7rem;
+    }
+    
+    /* Input area */
+    .chat-input {
+      border-top: 1px solid #dee2e6;
+      padding: 1rem 1.5rem;
+      background: #f8f9fa;
+    }
+    
+    .input-note {
+      font-size: 0.7rem;
+      color: #6c757d;
+      margin-bottom: 0.5rem;
+    }
+    
+    .input-container {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+    }
+    
+    .input-wrapper {
+      flex: 1;
+      position: relative;
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 44px;
+      max-height: 120px;
+      padding: 0.75rem;
+      border: 2px solid #dee2e6;
+      border-radius: 22px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: none;
+      transition: border-color 0.2s;
+    }
+    
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .send-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 22px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      white-space: nowrap;
+    }
+    
+    .send-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    /* Details panel */
+    .details-panel {
+      width: 340px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .details-header {
+      background: #f8f9fa;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #dee2e6;
+      font-weight: 600;
+      color: #495057;
+    }
+    
+    .details-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem;
+    }
+    
+    .details-empty {
+      color: #6c757d;
+      font-size: 0.875rem;
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+    
+    .detail-section {
+      margin-bottom: 1.5rem;
+    }
+    
+    .detail-section:last-child {
+      margin-bottom: 0;
+    }
+    
+    .detail-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #6c757d;
+      margin-bottom: 0.625rem;
+      letter-spacing: 0.5px;
+    }
+    
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #f1f3f5;
+    }
+    
+    .detail-item:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    
+    .detail-label {
+      font-size: 0.75rem;
+      color: #6c757d;
+      font-weight: 500;
+    }
+    
+    .detail-value {
+      font-size: 0.85rem;
+      color: #212529;
+      word-break: break-all;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+    
+    .detail-value a {
+      color: #667eea;
+      text-decoration: none;
+    }
+    
+    .detail-value a:hover {
+      text-decoration: underline;
+    }
+    
+    .json-toggle-btn {
+      width: 100%;
+      background: transparent;
+      color: #667eea;
+      border: 1px solid #667eea;
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+      margin-top: 0.75rem;
+    }
+    
+    .json-toggle-btn:hover {
+      background: #667eea;
+      color: white;
+    }
+    
+    .json-content {
+      background: #282c34;
+      color: #abb2bf;
+      border-radius: 6px;
+      padding: 0.875rem;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      margin-top: 0.75rem;
+      max-height: 300px;
+      overflow-y: auto;
+      display: none;
+    }
+    
+    .json-content.show {
+      display: block;
+    }
+    
+    /* Scrollbar styling */
+    .chat-messages::-webkit-scrollbar,
+    .details-content::-webkit-scrollbar,
+    .json-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .chat-messages::-webkit-scrollbar-thumb,
+    .details-content::-webkit-scrollbar-thumb,
+    .json-content::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 3px;
+    }
+    
+    .chat-messages::-webkit-scrollbar-thumb:hover,
+    .details-content::-webkit-scrollbar-thumb:hover {
+      background: #a0aec0;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 1024px) {
+      .main-container {
+        flex-direction: column;
+        padding: 0.5rem;
+      }
+      
+      .details-panel {
+        width: 100%;
+        max-height: 300px;
+      }
+      
+      .message {
+        max-width: 85%;
+      }
+    }
+    
+    @media (max-width: 640px) {
+      .status-bar {
+        font-size: 0.7rem;
+        gap: 0.5rem;
+      }
+      
+      .chat-header {
+        font-size: 1rem;
+        padding: 0.875rem 1rem;
+      }
+      
+      .chat-messages {
+        padding: 1rem;
+      }
+      
+      .message {
+        max-width: 90%;
+      }
+      
+      .input-container {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .send-btn {
+        width: 100%;
+      }
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top status bar -->
+  <div class="status-bar" id="statusBar">
+    <div class="status-item">
+      <span class="status-label">Health:</span>
+      <span class="status-value" id="statusHealth">Loading...</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">Mode:</span>
+      <span class="status-value" id="statusMode">Loading...</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">Chain:</span>
+      <span class="status-value" id="statusChain">Loading...</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">Contract:</span>
+      <span class="status-value" id="statusContract">Loading...</span>
+    </div>
+  </div>
+  
+  <!-- Main container -->
+  <div class="main-container">
+    <!-- Chat container -->
+    <div class="chat-container">
+      <div class="chat-header">
+        💬 ProofAI Chat
+      </div>
+      
+      <div class="chat-messages" id="chatMessages">
+        <!-- Messages will be appended here -->
+      </div>
+      
+      <div class="chat-input">
+        <div class="input-note">
+          Each message is recorded on MegaETH testnet (JobRegistry)
+        </div>
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea 
+              id="promptInput" 
+              placeholder="Type your message... (Press Enter to send, Shift+Enter for newline)"
+              rows="1"
+            ></textarea>
+          </div>
+          <button class="send-btn" id="sendBtn">Send</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Details panel -->
+    <div class="details-panel">
+      <div class="details-header">
+        Job Details
+      </div>
+      <div class="details-content" id="detailsContent">
+        <div class="details-empty">
+          Send a message to see job details
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // DOM elements
+    const chatMessages = document.getElementById('chatMessages');
+    const promptInput = document.getElementById('promptInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const detailsContent = document.getElementById('detailsContent');
+    
+    // Status bar elements
+    const statusHealth = document.getElementById('statusHealth');
+    const statusMode = document.getElementById('statusMode');
+    const statusChain = document.getElementById('statusChain');
+    const statusContract = document.getElementById('statusContract');
+    
+    // State
+    let isProcessing = false;
+    let currentThinkingBubble = null;
+    
+    // Auto-resize textarea
+    promptInput.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+    
+    // Fetch status on page load
+    async function loadStatus() {
+      try {
+        // Fetch health
+        const healthRes = await fetch('/health');
+        const health = await healthRes.json();
+        
+        if (health.ok) {
+          statusHealth.textContent = 'OK';
+          statusHealth.className = 'status-value status-ok';
+          statusChain.textContent = `MegaETH Testnet (${health.chainId})`;
+        } else {
+          statusHealth.textContent = 'ERROR';
+          statusHealth.className = 'status-value status-error';
+        }
+      } catch (error) {
+        statusHealth.innerHTML = '<span class="status-badge badge-error">Degraded</span>';
+        console.error('Failed to fetch health:', error);
+      }
+      
+      try {
+        // Fetch jobs mode
+        const modeRes = await fetch('/jobs/mode');
+        const mode = await modeRes.json();
+        
+        statusMode.textContent = mode.signingMode || 'unknown';
+        
+        if (mode.contractV1) {
+          const shortAddr = mode.contractV1.slice(0, 6) + '...' + mode.contractV1.slice(-4);
+          const explorerUrl = `https://megaeth-testnet-v2.blockscout.com/address/${mode.contractV1}`;
+          statusContract.innerHTML = `<a href="${explorerUrl}" target="_blank" rel="noopener noreferrer">${shortAddr}</a>`;
+        } else {
+          statusContract.textContent = 'Not configured';
+        }
+      } catch (error) {
+        statusMode.textContent = 'unknown';
+        statusContract.textContent = 'unknown';
+        console.error('Failed to fetch mode:', error);
+      }
+    }
+    
+    // Add message to chat
+    function addMessage(type, content, metadata = null) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${type}`;
+      
+      const bubbleDiv = document.createElement('div');
+      bubbleDiv.className = 'message-bubble';
+      
+      if (metadata && metadata.isThinking) {
+        bubbleDiv.classList.add('thinking');
+      }
+      if (metadata && metadata.isError) {
+        bubbleDiv.classList.add('error');
+      }
+      
+      bubbleDiv.textContent = content;
+      messageDiv.appendChild(bubbleDiv);
+      
+      // Add metadata for assistant messages
+      if (type === 'assistant' && metadata && !metadata.isThinking && !metadata.isError) {
+        const metadataDiv = document.createElement('div');
+        metadataDiv.className = 'message-metadata';
+        
+        let metadataHTML = '';
+        
+        // Badge
+        if (metadata.badge) {
+          metadataHTML += `<span class="message-badge badge-${metadata.badge.type}">${metadata.badge.text}</span>`;
+        }
+        
+        // Job ID and tx hash
+        if (metadata.jobId) {
+          metadataHTML += `<span>job #${metadata.jobId}</span>`;
+        }
+        
+        if (metadata.txHash) {
+          const explorerUrl = `https://megaeth-testnet-v2.blockscout.com/tx/${metadata.txHash}`;
+          metadataHTML += `<span>tx: <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer">${metadata.txHash.slice(0, 6)}...${metadata.txHash.slice(-4)}</a></span>`;
+        }
+        
+        // Timestamp
+        if (metadata.timestamp) {
+          metadataHTML += `<span class="timestamp">${metadata.timestamp}</span>`;
+        }
+        
+        metadataDiv.innerHTML = metadataHTML;
+        messageDiv.appendChild(metadataDiv);
+      }
+      
+      chatMessages.appendChild(messageDiv);
+      scrollToBottom();
+      
+      return messageDiv;
+    }
+    
+    // Scroll to bottom
+    function scrollToBottom() {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    // Format timestamp
+    function formatTimestamp(isoString) {
+      if (!isoString) return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const date = new Date(isoString);
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // Update details panel
+    function updateDetailsPanel(response) {
+      const timestamp = response.artifactPreview?.timestampIso || new Date().toISOString();
+      
+      let html = `
+        <div class="detail-section">
+          <div class="detail-title">Blockchain Metadata</div>
+          
+          <div class="detail-item">
+            <div class="detail-label">Job ID</div>
+            <div class="detail-value">${response.jobId || 'N/A'}</div>
+          </div>
+          
+          <div class="detail-item">
+            <div class="detail-label">Signing Mode</div>
+            <div class="detail-value">${response.signingMode || 'N/A'}</div>
+          </div>
+          
+          <div class="detail-item">
+            <div class="detail-label">Attestation Hash</div>
+            <div class="detail-value">${response.attestationHash || 'N/A'}</div>
+          </div>
+          
+          <div class="detail-item">
+            <div class="detail-label">Transaction Hash</div>
+            <div class="detail-value">
+      `;
+      
+      if (response.txHash) {
+        const explorerUrl = `https://megaeth-testnet-v2.blockscout.com/tx/${response.txHash}`;
+        html += `<a href="${explorerUrl}" target="_blank" rel="noopener noreferrer">${response.txHash}</a>`;
+      } else {
+        html += 'N/A';
+      }
+      
+      html += `
+            </div>
+          </div>
+          
+          <div class="detail-item">
+            <div class="detail-label">Anchor Tx</div>
+            <div class="detail-value">
+      `;
+      
+      if (response.anchorTx && response.anchorTx.startsWith('0x')) {
+        const explorerUrl = `https://megaeth-testnet-v2.blockscout.com/tx/${response.anchorTx}`;
+        html += `<a href="${explorerUrl}" target="_blank" rel="noopener noreferrer">${response.anchorTx}</a>`;
+      } else {
+        html += response.anchorTx || 'N/A';
+      }
+      
+      html += `
+            </div>
+          </div>
+          
+          <div class="detail-item">
+            <div class="detail-label">Timestamp</div>
+            <div class="detail-value">${timestamp}</div>
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <div class="detail-title">Model Output</div>
+          <div class="detail-item">
+            <div class="detail-label">Model</div>
+            <div class="detail-value">${response.modelOutput?.model || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Type</div>
+            <div class="detail-value">${response.modelOutput?.usedStub ? 'Stubbed' : 'Live LLM'}</div>
+          </div>
+        </div>
+        
+        <button class="json-toggle-btn" onclick="toggleJson()">Show Full JSON</button>
+        <pre class="json-content" id="jsonContent">${JSON.stringify(response, null, 2)}</pre>
+      `;
+      
+      detailsContent.innerHTML = html;
+    }
+    
+    // Toggle JSON viewer
+    function toggleJson() {
+      const jsonContent = document.getElementById('jsonContent');
+      const btn = event.target;
+      
+      jsonContent.classList.toggle('show');
+      
+      if (jsonContent.classList.contains('show')) {
+        btn.textContent = 'Hide Full JSON';
+      } else {
+        btn.textContent = 'Show Full JSON';
+      }
+    }
+    
+    // Make toggleJson available globally
+    window.toggleJson = toggleJson;
+    
+    // Send message
+    async function sendMessage() {
+      const prompt = promptInput.value.trim();
+      
+      if (!prompt || isProcessing) {
+        return;
+      }
+      
+      // Add user message
+      addMessage('user', prompt);
+      
+      // Clear input
+      promptInput.value = '';
+      promptInput.style.height = 'auto';
+      
+      // Disable input
+      isProcessing = true;
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending...';
+      
+      // Add thinking bubble
+      currentThinkingBubble = addMessage('assistant', 'ProofAI is thinking...', { isThinking: true });
+      
+      // Generate idempotency key
+      const idempotencyKey = `browser-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      
+      try {
+        const response = await fetch('/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-idempotency-key': idempotencyKey,
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            amountEth: '0.0001',
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Remove thinking bubble
+        if (currentThinkingBubble) {
+          currentThinkingBubble.remove();
+          currentThinkingBubble = null;
+        }
+        
+        // Add assistant response
+        let outputText = 'No model output available (blockchain-only job metadata).';
+        let badge = null;
+        
+        if (data.modelOutput) {
+          outputText = data.modelOutput.text || outputText;
+          badge = {
+            type: data.modelOutput.usedStub ? 'stub' : 'live',
+            text: data.modelOutput.usedStub ? 'Stub' : 'Live LLM'
+          };
+        }
+        
+        const timestamp = formatTimestamp(data.artifactPreview?.timestampIso);
+        
+        addMessage('assistant', outputText, {
+          badge: badge,
+          jobId: data.jobId,
+          txHash: data.txHash,
+          timestamp: timestamp
+        });
+        
+        // Update details panel
+        updateDetailsPanel(data);
+        
+      } catch (error) {
+        console.error('Job submission failed:', error);
+        
+        // Remove thinking bubble
+        if (currentThinkingBubble) {
+          currentThinkingBubble.remove();
+          currentThinkingBubble = null;
+        }
+        
+        // Add error message
+        addMessage('assistant', `Error submitting job: ${error.message}. Please try again.`, { isError: true });
+        
+      } finally {
+        // Re-enable input
+        isProcessing = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+        promptInput.focus();
+      }
+    }
+    
+    // Send button handler
+    sendBtn.addEventListener('click', sendMessage);
+    
+    // Keyboard handler for textarea
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    
+    // Load status on page load
+    loadStatus();
+    
+    // Add welcome message
+    setTimeout(() => {
+      addMessage('assistant', 'Welcome to ProofAI! Ask me anything, and I\'ll process your request with blockchain-backed attestation.', {
+        badge: { type: 'live', text: 'System' },
+        timestamp: formatTimestamp()
+      });
+    }, 500);
+  </script>
+</body>
+</html>

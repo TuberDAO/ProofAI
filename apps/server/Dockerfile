@@ -60,6 +60,9 @@ COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/packages/contracts/typechain-types ./packages/contracts/typechain-types
 COPY --from=builder /app/packages/contracts/artifacts ./packages/contracts/artifacts
 
+# Copy static files (public directory)
+COPY apps/server/public ./apps/server/public
+
 # Change ownership
 RUN chown -R nodejs:nodejs /app
 

@@ -18,6 +18,7 @@ import { getIdempotentResult, setIdempotentResult } from '../storage/idempotency
 import { createJobKey, isReplay, markAsSeen } from '../storage/replay.js';
 import { verifyQuote, generatePlaceholderAttestation } from '../attestation/verify.js';
 import { anchorReceipt } from '../receipt/anchor.js';
+import { runModelInference } from '../llm/inference.js';
 import type { Hex } from 'viem';
 import { keccak256, toBytes } from 'viem';
 
@@ -296,7 +297,7 @@ export async function jobRoutes(fastify: FastifyInstance) {
       signingMode: env.signingMode,
       contractV1: env.jobRegistryAddress,
       contractV2: env.jobRegistryV2Address || null,
-      chainId: 6342,
+      chainId: 6343,
     };
   });
 
@@ -373,6 +374,11 @@ export async function jobRoutes(fastify: FastifyInstance) {
         const receiptHash = keccak256(toBytes(JSON.stringify(receipt)));
         const anchor = await anchorReceipt(receiptHash);
 
+        // 6. Run model inference
+        const inference = await runModelInference(prompt, {
+          model: 'llama-3-8b-instruct',
+        });
+
         const response = {
           jobId: result.jobId.toString(),
           attestationHash: result.attestationHash,
@@ -382,6 +388,11 @@ export async function jobRoutes(fastify: FastifyInstance) {
           artifactPreview: artifact,
           enclaveDigest: quoteVerification.digest,
           anchorTx: anchor.txHash,
+          modelOutput: {
+            text: inference.output,
+            model: inference.model,
+            usedStub: inference.usedStub,
+          },
         };
 
         // 4. Store idempotent result

@@ -12,8 +12,8 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { env } from './config/env.js';
 
-// MegaETH testnet Chain ID
-export const MEGAETH_TESTNET_CHAIN_ID = 6342;
+// MegaETH testnet v2 Chain ID
+export const MEGAETH_TESTNET_CHAIN_ID = 6343;
 
 // JobRegistry V1 ABI
 const jobRegistryAbi = [
@@ -217,6 +217,16 @@ export async function submitJobOnChain(
   amountEth: string,
   submitter?: `0x${string}`
 ): Promise<JobSubmissionResult> {
+  // If MOCK_ONCHAIN is enabled, return fake data without calling blockchain
+  if (env.mockOnChain) {
+    return Promise.resolve({
+      jobId: BigInt(Math.floor(Date.now() / 1000)),
+      attestationHash,
+      txHash: ('0x' + 'deadbeef'.repeat(8)) as Hash,
+      receiptHash: undefined,
+    });
+  }
+
   try {
     // Use V2 if available and we have a submitter
     if (env.jobRegistryV2Address && submitter) {

@@ -102,8 +102,8 @@ export async function verifyClientSignature(input: ClientJobRequest): Promise<{
     );
   }
 
-  // 4. Validate chainId (MegaETH testnet is always 6342)
-  const expectedChainId = 6342;
+  // 4. Validate chainId (MegaETH testnet v2 is always 6343)
+  const expectedChainId = 6343;
   if (input.chainId !== expectedChainId) {
     throw new Error(
       `Invalid chainId: expected ${expectedChainId}, got ${input.chainId}`
@@ -179,7 +179,7 @@ export async function verifySessionSignature(input: SessionCreateRequest): Promi
   }
 
   // 3. Validate chainId
-  const expectedChainId = 6342;
+  const expectedChainId = 6343;
   if (input.chainId !== expectedChainId) {
     throw new Error(
       `Invalid chainId: expected ${expectedChainId}, got ${input.chainId}`

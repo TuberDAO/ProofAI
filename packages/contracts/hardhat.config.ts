@@ -13,9 +13,11 @@ const config: HardhatUserConfig = {
   },
   networks: {
     megaeth: {
-      url: process.env.MEGAETH_RPC_URL || "",
+      url: process.env.MEGAETH_RPC_URL || "https://timothy.megaeth.com/rpc",
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
-      chainId: 6342,
+      chainId: 6343,
+      // Let the deploy script's explicit gasLimit control the transaction
+      // Network-level gas setting removed to avoid conflicts
     },
   },
 };

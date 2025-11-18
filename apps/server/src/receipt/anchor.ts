@@ -9,6 +9,7 @@
  * - Gas price optimization
  */
 import { keccak256, toBytes } from 'viem';
+import { env } from '../config/env.js';
 
 export interface AnchorReceipt {
   txHash: string;
@@ -26,6 +27,13 @@ export interface AnchorReceipt {
  * @returns Transaction hash
  */
 export async function anchorReceipt(hash: string): Promise<AnchorReceipt> {
+  // If MOCK_ONCHAIN is enabled, return a fake anchor result
+  if (env.mockOnChain) {
+    return {
+      txHash: '0x' + 'cafebabe'.repeat(8),
+    };
+  }
+
   // TODO: Implement real anchoring logic:
   // 1. Add hash to batch accumulator
   // 2. When batch is full or time window expires:

@@ -8,7 +8,18 @@ async function main() {
 
   // Deploy JobRegistry
   const JobRegistry = await ethers.getContractFactory("JobRegistry");
-  const jobRegistry = await JobRegistry.deploy();
+  
+  // Log bytecode size for debugging
+  const bytecode = JobRegistry.bytecode;
+  console.log("JobRegistry bytecode length:", bytecode.length, "bytes");
+  
+  // Use a much higher gas limit to avoid out-of-gas during deployment
+  const gasLimit = 25_000_000n;
+  console.log("Using gasLimit override:", gasLimit.toString());
+  
+  const jobRegistry = await JobRegistry.deploy({
+    gasLimit,
+  });
   
   await jobRegistry.waitForDeployment();
   

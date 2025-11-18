@@ -2,8 +2,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Default to MegaETH testnet RPC if not provided
-const DEFAULT_MEGAETH_RPC = 'https://carrot.megaeth.com/rpc';
+// Default to MegaETH testnet v2 RPC if not provided
+const DEFAULT_MEGAETH_RPC = 'https://timothy.megaeth.com/rpc';
 
 export const config = {
   port: parseInt(process.env.PORT || '4000', 10),

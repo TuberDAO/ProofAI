@@ -17,27 +17,29 @@ This is a **pnpm monorepo** with three workspaces:
 - **Foundry** (for smart contracts) – [Install](https://book.getfoundry.sh/getting-started/installation)
 - **MegaETH Testnet Wallet** with testnet ETH (see setup instructions below)
 
-## MegaETH Testnet Setup
+## MegaETH Testnet v2 (6343)
 
 ### Network Details
 
-- **Chain ID:** 6342
-- **Network Name:** MegaETH Testnet
-- **RPC URL:** https://carrot.megaeth.com/rpc
-- **Block Explorer:** https://www.oklink.com/megaeth-testnet
+- **Chain ID:** 6343
+- **Network Name:** MegaETH Testnet v2
+- **RPC URL:** https://timothy.megaeth.com/rpc
+- **Block Explorer:** https://megaeth-testnet-v2.blockscout.com/
 
 ⚠️ **IMPORTANT:** MegaETH testnet endpoints are rate-limited and may change. Check [docs.megaeth.com](https://docs.megaeth.com) for the latest information.
 
-### Adding MegaETH Testnet to MetaMask
+**Note:** The JobRegistry contract address is configured via the `JOB_REGISTRY_ADDRESS` environment variable. Deploy the contract to the new testnet before starting the server.
+
+### Adding MegaETH Testnet v2 to MetaMask
 
 1. Open MetaMask and click on the network dropdown
 2. Click "Add Network" → "Add a network manually"
 3. Enter the following details:
-   - **Network Name:** MegaETH Testnet
-   - **RPC URL:** https://carrot.megaeth.com/rpc
-   - **Chain ID:** 6342
+   - **Network Name:** MegaETH Testnet v2
+   - **RPC URL:** https://timothy.megaeth.com/rpc
+   - **Chain ID:** 6343
    - **Currency Symbol:** ETH
-   - **Block Explorer:** https://www.oklink.com/megaeth-testnet
+   - **Block Explorer:** https://megaeth-testnet-v2.blockscout.com/
 
 Alternatively, you can use:
 - [ChainList](https://chainlist.org/?search=megaeth) or [ChainList.wtf](https://chainlist.wtf) to add the network automatically
@@ -119,7 +121,7 @@ cp env.example .env
 
 Edit `packages/contracts/.env`:
 ```bash
-MEGAETH_RPC_URL=https://carrot.megaeth.com/rpc
+MEGAETH_RPC_URL=https://timothy.megaeth.com/rpc
 DEPLOYER_PRIVATE_KEY=your_private_key_without_0x
 ```
 
@@ -175,8 +177,8 @@ cp env.example .env
 
 Edit `apps/server/.env`:
 ```bash
-MEGAETH_RPC_URL=https://carrot.megaeth.com/rpc
-JOB_REGISTRY_ADDRESS=0x...  # from contract deployment
+MEGAETH_RPC_URL=https://timothy.megaeth.com/rpc
+JOB_REGISTRY_ADDRESS=0x...  # from contract deployment on chain 6343
 SERVER_WALLET_PRIVATE_KEY=0x...  # BURNER wallet with testnet ETH
 PROVIDER_ADDRESS=0x...  # can be same as server wallet address
 ALLOWED_ORIGIN=http://localhost:3000
@@ -235,7 +237,7 @@ Follow these steps for your first end-to-end test:
 - [ ] Node.js >= 18 and pnpm >= 8 installed
 - [ ] Foundry installed (`forge --version` works)
 - [ ] Created a BURNER wallet for testnet
-- [ ] Added MegaETH Testnet (Chain ID 6342) to MetaMask
+- [ ] Added MegaETH Testnet v2 (Chain ID 6343) to MetaMask
 - [ ] Obtained testnet ETH for your burner wallet
 
 ### ✅ Setup Steps
@@ -407,8 +409,8 @@ Health check that verifies blockchain connectivity.
 ```json
 {
   "ok": true,
-  "chainId": 6342,
-  "network": "MegaETH Testnet"
+  "chainId": 6343,
+  "network": "MegaETH Testnet v2"
 }
 ```
 
@@ -482,10 +484,10 @@ This MVP includes several security and privacy features:
 ### Contract deployment fails
 
 - **Ensure your deployer wallet has testnet ETH** – need ~0.001 ETH
-- **Verify `MEGAETH_RPC_URL` is correct** – default is https://carrot.megaeth.com/rpc
+- **Verify `MEGAETH_RPC_URL` is correct** – default is https://timothy.megaeth.com/rpc
 - **Check `DEPLOYER_PRIVATE_KEY` format** – must be without `0x` prefix for Foundry
 - **RPC rate limit exceeded** – wait a moment and try again
-- **Invalid chain** – verify you're connected to MegaETH testnet (Chain ID 6342)
+- **Invalid chain** – verify you're connected to MegaETH testnet v2 (Chain ID 6343)
 
 ### Server can't connect to blockchain
 
@@ -493,7 +495,7 @@ This MVP includes several security and privacy features:
 - **Check `JOB_REGISTRY_ADDRESS`** – must match deployed contract address
 - **Ensure `SERVER_WALLET_PRIVATE_KEY` format** – must include `0x` prefix
 - **Confirm wallet has testnet ETH** – need ~0.001 ETH for gas fees
-- **RPC issues** – check if https://carrot.megaeth.com/rpc is accessible
+- **RPC issues** – check if https://timothy.megaeth.com/rpc is accessible
 - **Rate limiting** – MegaETH testnet RPC is rate-limited, retry after a moment
 
 ### Web app shows CORS errors
@@ -520,7 +522,7 @@ This MVP includes several security and privacy features:
 ### General tips
 
 - **Check server logs** – look for warnings about missing env vars or connection issues
-- **Verify chain ID** – call `/health` endpoint to confirm server is connected to chain 6342
+- **Verify chain ID** – call `/health` endpoint to confirm server is connected to chain 6343
 - **Clear browser cache** – especially if you updated env vars in the web app
 - **Use burner wallets only** – never use mainnet/production keys for testnet
 

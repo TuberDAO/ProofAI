@@ -21,7 +21,7 @@ cp env.example .env
 **⚠️ SECURITY:** Use a BURNER wallet for testnet deployment ONLY. Never use production keys!
 
 Required values:
-- `MEGAETH_RPC_URL`: https://carrot.megaeth.com/rpc (MegaETH testnet, Chain ID 6342)
+- `MEGAETH_RPC_URL`: https://timothy.megaeth.com/rpc (MegaETH testnet v2, Chain ID 6343)
 - `DEPLOYER_PRIVATE_KEY`: Your burner wallet private key (without `0x` prefix)
 
 ## Commands
@@ -52,7 +52,7 @@ After deployment, copy the `JOB_REGISTRY_ADDRESS` from the output to `apps/serve
 
 The deploy script will print:
 - Contract address
-- Chain ID (should be 6342 for MegaETH testnet)
+- Chain ID (should be 6343 for MegaETH testnet v2)
 - Explorer link to view the contract
 - Next steps for configuring the server
 

@@ -19,10 +19,10 @@ contract DeployScript is Script {
         console.log("JobRegistry deployed successfully!");
         console.log("========================================");
         console.log("Contract address:", address(registry));
-        console.log("Chain ID: 6342 (MegaETH Testnet)");
+        console.log("Chain ID: 6343 (MegaETH Testnet v2)");
         console.log("");
         console.log("View on Explorer:");
-        console.log("https://www.oklink.com/megaeth-testnet/address/%s", address(registry));
+        console.log("https://megaeth-testnet-v2.blockscout.com/address/%s", address(registry));
         console.log("");
         console.log("========================================");
         console.log("Next steps:");

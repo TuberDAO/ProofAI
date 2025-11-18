@@ -7,6 +7,8 @@
     "hh:compile": "hardhat compile",
     "hh:deploy:megaeth": "hardhat run --network megaeth scripts/deploy.ts",
     "hh:deploy:megaeth:v2": "hardhat run --network megaeth scripts/deploy-v2.ts",
+    "hh:deploy:smoketest:megaeth": "hardhat run --network megaeth scripts/deploySmokeTest.ts",
+    "hh:get-address": "hardhat run scripts/get-address.ts",
     "smart-deploy": "node scripts/smart-deploy.mjs",
     "test": "forge test -vvv",
     "typecheck": "echo \"Contracts use Solidity; no TS typecheck needed\"",

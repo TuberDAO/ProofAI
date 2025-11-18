@@ -449,3 +449,4 @@ The ProofAI backend is now:
 **Next phase**: Wire real Intel SGX / AMD SEV / NVIDIA H100 attestation libraries and implement Merkle batch anchoring to blockchain.
 
 
+

@@ -3,12 +3,15 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-// Default MegaETH testnet RPC
-const DEFAULT_MEGAETH_RPC = 'https://carrot.megaeth.com/rpc';
+// Default MegaETH testnet v2 RPC
+const DEFAULT_MEGAETH_RPC = 'https://timothy.megaeth.com/rpc';
 
 // Allowed signing modes
 const SIGNING_MODES = ['server', 'client'] as const;
 type SigningMode = typeof SIGNING_MODES[number];
+
+// Development toggle for mocking on-chain operations
+const MOCK_ONCHAIN = process.env.MOCK_ONCHAIN === 'true';
 
 /**
  * Normalize a private key: trim, remove quotes, prepend 0x if missing
@@ -74,8 +77,8 @@ function validateEnv() {
     );
   }
 
-  // Validate SERVER_WALLET_PRIVATE_KEY (only required in server mode)
-  if (signingMode === 'server') {
+  // Validate SERVER_WALLET_PRIVATE_KEY (only required in server mode without mocking)
+  if (signingMode === 'server' && !MOCK_ONCHAIN) {
     if (!privateKey) {
       errors.push('SERVER_WALLET_PRIVATE_KEY is required in server signing mode');
     } else if (!PATTERNS.PRIVATE_KEY.test(privateKey)) {
@@ -84,7 +87,7 @@ function validateEnv() {
       );
     }
 
-    // Validate PROVIDER_ADDRESS (only required in server mode)
+    // Validate PROVIDER_ADDRESS (only required in server mode without mocking)
     if (!providerAddress) {
       errors.push('PROVIDER_ADDRESS is required in server signing mode');
     } else if (!PATTERNS.ADDRESS.test(providerAddress)) {
@@ -94,8 +97,8 @@ function validateEnv() {
     }
   }
 
-  // Validate JOB_REGISTRY_ADDRESS (only required in server mode)
-  if (signingMode === 'server') {
+  // Validate JOB_REGISTRY_ADDRESS (only required in server mode without mocking)
+  if (signingMode === 'server' && !MOCK_ONCHAIN) {
     if (!registryAddress) {
       errors.push('JOB_REGISTRY_ADDRESS is required in server signing mode');
     } else if (!PATTERNS.ADDRESS.test(registryAddress)) {
@@ -105,8 +108,8 @@ function validateEnv() {
     }
   }
 
-  // Validate MEGAETH_RPC_URL (only required in server mode)
-  if (signingMode === 'server' && !PATTERNS.RPC_URL.test(rpcUrl)) {
+  // Validate MEGAETH_RPC_URL (only required in server mode without mocking)
+  if (signingMode === 'server' && !MOCK_ONCHAIN && !PATTERNS.RPC_URL.test(rpcUrl)) {
     errors.push('MEGAETH_RPC_URL must be a valid HTTP(S) URL');
   }
 
@@ -171,6 +174,7 @@ export const env = {
   serverWalletPrivateKey: validated.privateKey as `0x${string}`,
   providerAddress: validated.providerAddress as `0x${string}`,
   signingMode: validated.signingMode as 'server' | 'client',
+  mockOnChain: MOCK_ONCHAIN,
   allowedOrigin: process.env.ALLOWED_ORIGIN || 'http://localhost:3000',
   minJobEth: process.env.MIN_JOB_ETH || '0.00001',
   maxJobEth: process.env.MAX_JOB_ETH || '0.01',
@@ -196,7 +200,7 @@ export const env = {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
-  allowedChainIds: (process.env.ALLOWED_CHAIN_IDS || '6342')
+  allowedChainIds: (process.env.ALLOWED_CHAIN_IDS || '6343')
     .split(',')
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => !isNaN(n)),
@@ -239,11 +243,14 @@ export function isAllowedContract(contract: string): boolean {
 console.log('✅ Environment validated successfully');
 console.log(`   RPC: ${env.megaethRpcUrl}`);
 console.log(`   Signing Mode: ${env.signingMode}`);
+if (env.mockOnChain) {
+  console.log(`   🧪 MOCK_ONCHAIN: enabled (development mode)`);
+}
 console.log(`   Contract V1: ${env.jobRegistryAddress}`);
 if (env.jobRegistryV2Address) {
   console.log(`   Contract V2: ${env.jobRegistryV2Address}`);
 }
-if (env.signingMode === 'server') {
+if (env.signingMode === 'server' && !env.mockOnChain) {
   console.log(`   Provider: ${env.providerAddress}`);
 }
 console.log(`   Security: ${env.allowedChainIds.length} chain(s), ${env.allowedContracts.length} contract(s), ${env.allowedModels.length} model(s)`);

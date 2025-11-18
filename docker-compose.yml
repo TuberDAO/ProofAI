@@ -21,8 +21,30 @@ services:
     environment:
       NODE_ENV: development
       PORT: "8080"
-      SIGNING_MODE: client
+      SIGNING_MODE: server
       REDIS_URL: "redis://redis:6379"
+      
+      # ========================================
+      # BLOCKCHAIN CONFIGURATION
+      # ========================================
+      
+      # MOCK_ONCHAIN: Set to "true" for local dev (no real blockchain calls)
+      # Set to "false" to connect to real MegaETH testnet
+      MOCK_ONCHAIN: "false"
+      
+      # MegaETH testnet v2 configuration (chainId 6343)
+      MEGAETH_RPC_URL: "https://timothy.megaeth.com/rpc"
+      # TODO: Set JOB_REGISTRY_ADDRESS after deploying JobRegistry to chain 6343
+      JOB_REGISTRY_ADDRESS: "0x0862abCd451D710d857011C779C1CCe020e7cB6C"
+      JOB_REGISTRY_V2_ADDRESS: "0x0862abCd451D710d857011C779C1CCe020e7cB6C"
+      SERVER_WALLET_PRIVATE_KEY: "0x4341372499e1048e70586cf456969db859b4a67832b82ae3a85e94a606c3524c"
+      PROVIDER_ADDRESS: "0x2263A3C0eAF7967d00c35a0A70C2617152BdF14F"
+      
+      # ========================================
+      # NOTE: Set SERVER_WALLET_PRIVATE_KEY and PROVIDER_ADDRESS above
+      # Both are required when MOCK_ONCHAIN="false"
+      # ========================================
+      
     depends_on:
       redis:
         condition: service_healthy

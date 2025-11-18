@@ -21,6 +21,10 @@ declare module "hardhat/types/runtime" {
       name: "JobRegistryV2",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.JobRegistryV2__factory>;
+    getContractFactory(
+      name: "SmokeTest",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.SmokeTest__factory>;
 
     getContractAt(
       name: "JobRegistry",
@@ -32,6 +36,11 @@ declare module "hardhat/types/runtime" {
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.JobRegistryV2>;
+    getContractAt(
+      name: "SmokeTest",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.SmokeTest>;
 
     deployContract(
       name: "JobRegistry",
@@ -41,6 +50,10 @@ declare module "hardhat/types/runtime" {
       name: "JobRegistryV2",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.JobRegistryV2>;
+    deployContract(
+      name: "SmokeTest",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.SmokeTest>;
 
     deployContract(
       name: "JobRegistry",
@@ -52,6 +65,11 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.JobRegistryV2>;
+    deployContract(
+      name: "SmokeTest",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.SmokeTest>;
 
     // default types
     getContractFactory(

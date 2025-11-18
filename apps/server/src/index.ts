@@ -1,6 +1,9 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
+import fs from 'fs';
 import { env } from './config/env.js';
 import { healthRoutes } from './routes/health.js';
 import { jobRoutes } from './routes/jobs.js';
@@ -53,10 +56,52 @@ fastify.register(rateLimit, {
   cache: 10000, // cache up to 10k IPs
 });
 
-// Register CORS with restricted origin
+// Register CORS - permissive for local development
+// Allows: localhost, 127.0.0.1, and file:// origins (null)
 fastify.register(cors, {
-  origin: env.allowedOrigin,
+  origin: (origin, cb) => {
+    // Allow requests with no origin (like file://) or null origin
+    if (!origin || origin === 'null') {
+      cb(null, true);
+      return;
+    }
+    
+    // Allow localhost and 127.0.0.1 on any port
+    if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      cb(null, true);
+      return;
+    }
+    
+    // Reject all other origins
+    cb(null, false);
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-idempotency-key', 'x-session-id'],
   credentials: true,
+});
+
+// Register static file serving
+// Choose a static dir that works both in TS sources and built dist
+const candidates = [
+  path.resolve(process.cwd(), 'apps/server/public'),  // dev
+  path.resolve(process.cwd(), 'public')               // fallback
+];
+const staticRoot = candidates.find(p => fs.existsSync(p)) ?? candidates[0];
+
+fastify.register(fastifyStatic, {
+  root: staticRoot,
+  prefix: '/',  // serve at web root
+  index: ['index.html', 'demo.html'],
+  decorateReply: false  // don't override reply.sendFile
+});
+
+// Optional convenience: GET / opens demo if present
+fastify.get('/', async (req, reply) => {
+  const demo = path.join(staticRoot, 'demo.html');
+  if (fs.existsSync(demo)) {
+    return reply.type('text/html').send(fs.readFileSync(demo, 'utf8'));
+  }
+  return { ok: true };
 });
 
 // Register routes

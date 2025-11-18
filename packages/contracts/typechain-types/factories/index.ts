@@ -3,3 +3,4 @@
 /* eslint-disable */
 export { JobRegistry__factory } from "./JobRegistry__factory";
 export { JobRegistryV2__factory } from "./JobRegistryV2__factory";
+export { SmokeTest__factory } from "./SmokeTest__factory";

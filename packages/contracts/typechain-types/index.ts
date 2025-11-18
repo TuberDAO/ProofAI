@@ -3,6 +3,8 @@
 /* eslint-disable */
 export type { JobRegistry } from "./JobRegistry";
 export type { JobRegistryV2 } from "./JobRegistryV2";
+export type { SmokeTest } from "./SmokeTest";
 export * as factories from "./factories";
 export { JobRegistry__factory } from "./factories/JobRegistry__factory";
 export { JobRegistryV2__factory } from "./factories/JobRegistryV2__factory";
+export { SmokeTest__factory } from "./factories/SmokeTest__factory";
