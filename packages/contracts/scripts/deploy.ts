@@ -13,13 +13,7 @@ async function main() {
   const bytecode = JobRegistry.bytecode;
   console.log("JobRegistry bytecode length:", bytecode.length, "bytes");
   
-  // Use a much higher gas limit to avoid out-of-gas during deployment
-  const gasLimit = 25_000_000n;
-  console.log("Using gasLimit override:", gasLimit.toString());
-  
-  const jobRegistry = await JobRegistry.deploy({
-    gasLimit,
-  });
+  const jobRegistry = await JobRegistry.deploy();
   
   await jobRegistry.waitForDeployment();
   

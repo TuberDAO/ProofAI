@@ -2,6 +2,9 @@ import { FastifyInstance } from 'fastify';
 import { submitJobOnChain } from '../blockchain.js';
 import { buildArtifactFromPrompt } from '../attestation.js';
 import { env, isAllowedChainId, isAllowedContract } from '../config/env.js';
+
+const SKIP_ONCHAIN = true; // TEMP: force dev mode, should NEVER touch blockchain
+
 import { verifyClientSignature } from '../signature.js';
 import { getSession, incrementPrompts, isExpired } from '../storage/sessions.js';
 import {
@@ -18,9 +21,11 @@ import { getIdempotentResult, setIdempotentResult } from '../storage/idempotency
 import { createJobKey, isReplay, markAsSeen } from '../storage/replay.js';
 import { verifyQuote, generatePlaceholderAttestation } from '../attestation/verify.js';
 import { anchorReceipt } from '../receipt/anchor.js';
-import { runModelInference } from '../llm/inference.js';
+import { createPrivateInferenceEngine } from '../llm/engineFactory.js';
 import type { Hex } from 'viem';
 import { keccak256, toBytes } from 'viem';
+
+const inferenceEngine = createPrivateInferenceEngine();
 
 /**
  * Handle job submission with session authorization
@@ -301,11 +306,71 @@ export async function jobRoutes(fastify: FastifyInstance) {
     };
   });
 
+  // DEV-ONLY: Inference without any blockchain interaction
+  console.log('[ROUTE-REG] Registering POST /jobs/dev-test');
+  fastify.post('/jobs/dev-test', async (request, reply) => {
+    try {
+      const body = request.body as { prompt?: string; model?: string };
+
+      if (!body || typeof body.prompt !== 'string' || body.prompt.trim().length === 0) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          message: 'Field "prompt" is required and must be a non-empty string',
+        });
+      }
+
+      const prompt = body.prompt.trim();
+      const model = body.model ?? 'llama-3-8b-instruct';
+
+      // Log so we can see in the backend that this dev route is being used
+      fastify.log.warn(
+        `[DEV-JOBS] /jobs/dev-test invoked. This route never touches the blockchain. Model=${model}`
+      );
+
+      // Run inference via the PrivateInferenceEngine abstraction
+      const { answer, jobHash, attestation, model: resolvedModel, usedStub } =
+        await inferenceEngine.infer(prompt, {
+          model,
+        });
+
+      const response = {
+        devMode: true,
+        skipOnChain: true,
+        signingMode: 'server' as const,
+
+        // Fake on-chain-style fields so the frontend can reuse types if needed
+        jobId: '0',
+        txHash: null as string | null,
+        receiptHash: null as string | null,
+        attestationHash: jobHash,
+
+        modelOutput: {
+          text: answer,
+          model: resolvedModel ?? model,
+          usedStub: usedStub ?? false,
+        },
+
+        jobHash,
+        attestation,
+      };
+
+      return reply.status(200).send(response);
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      fastify.log.error(`[DEV-JOBS] /jobs/dev-test failed: ${errMsg}`);
+
+      return reply.status(500).send({
+        error: 'Dev job failed',
+        message: errMsg,
+      });
+    }
+  });
+
   // POST /jobs - Submit job (production-grade with all security features)
   fastify.post('/jobs', async (request, reply) => {
     // Check for session-based auth first
-    const sessionId = 
-      (request.headers['x-session-id'] as string) || 
+    const sessionId =
+      (request.headers['x-session-id'] as string) ||
       (request.body as any)?.sessionId;
 
     if (sessionId) {
@@ -322,7 +387,7 @@ export async function jobRoutes(fastify: FastifyInstance) {
 
       if (!parseResult.success) {
         const errMsg = parseResult.error.errors.map((e) => e.message).join('; ');
-        
+
         audit(
           createAuditEvent({
             request,
@@ -354,53 +419,108 @@ export async function jobRoutes(fastify: FastifyInstance) {
       }
 
       try {
-        // 3. Build attestation and submit
+        // 3. Always build artifact / attestation hash (even in dev mode, so hash is deterministic)
         const { artifact, attestationHash } = buildArtifactFromPrompt(prompt);
-        const result = await submitJobOnChain(attestationHash, amountEth);
 
-        // 4. Generate TEE attestation (placeholder)
-        const placeholderQuote = generatePlaceholderAttestation(prompt);
-        const quoteVerification = await verifyQuote(placeholderQuote);
+        // 4. If SKIP_ONCHAIN is NOT set, run the original full on-chain path
+        if (!SKIP_ONCHAIN) {
+          const result = await submitJobOnChain(attestationHash as Hex, amountEth);
 
-        // 5. Create receipt and anchor it
-        const receipt = {
-          model: 'llama-3-8b-instruct',
-          modelVersion: '1.0.0',
-          inputHash: attestationHash,
-          timestampIso: new Date().toISOString(),
-          codeVersion: process.env.GIT_COMMIT || 'dev',
-          enclaveDigest: quoteVerification.digest,
-        };
-        const receiptHash = keccak256(toBytes(JSON.stringify(receipt)));
-        const anchor = await anchorReceipt(receiptHash);
+          // Generate TEE attestation (placeholder)
+          const placeholderQuote = generatePlaceholderAttestation(prompt);
+          const quoteVerification = await verifyQuote(placeholderQuote);
 
-        // 6. Run model inference
-        const inference = await runModelInference(prompt, {
-          model: 'llama-3-8b-instruct',
-        });
+          // Create receipt and anchor it
+          const receipt = {
+            model: 'llama-3-8b-instruct',
+            modelVersion: '1.0.0',
+            inputHash: attestationHash,
+            timestampIso: new Date().toISOString(),
+            codeVersion: process.env.GIT_COMMIT || 'dev',
+            enclaveDigest: quoteVerification.digest,
+          };
+          const receiptHash = keccak256(toBytes(JSON.stringify(receipt)));
+          const anchor = await anchorReceipt(receiptHash);
 
-        const response = {
-          jobId: result.jobId.toString(),
-          attestationHash: result.attestationHash,
-          txHash: result.txHash,
-          receiptHash: result.receiptHash || null,
-          signingMode: 'server' as const,
-          artifactPreview: artifact,
-          enclaveDigest: quoteVerification.digest,
-          anchorTx: anchor.txHash,
-          modelOutput: {
-            text: inference.output,
-            model: inference.model,
-            usedStub: inference.usedStub,
-          },
-        };
+          // Run model inference
+          const { answer, jobHash, attestation, model, usedStub } =
+            await inferenceEngine.infer(prompt, {
+              model: 'llama-3-8b-instruct',
+            });
 
-        // 4. Store idempotent result
-        if (idempotencyKey) {
-          await setIdempotentResult(idempotencyKey, response);
+          const response = {
+            jobId: result.jobId.toString(),
+            attestationHash: result.attestationHash,
+            txHash: result.txHash,
+            receiptHash: result.receiptHash || null,
+            signingMode: 'server' as const,
+            artifactPreview: artifact,
+            enclaveDigest: quoteVerification.digest,
+            anchorTx: anchor.txHash,
+            modelOutput: {
+              text: answer,
+              model: model ?? 'llama-3-8b-instruct',
+              usedStub: usedStub ?? false,
+            },
+            jobHash,
+            attestation,
+            devMode: false,
+            skipOnChain: false,
+          };
+
+          if (idempotencyKey) {
+            await setIdempotentResult(idempotencyKey, response);
+          }
+
+          audit(
+            createAuditEvent({
+              request,
+              route: 'POST /jobs',
+              mode: 'server',
+              status: 200,
+              result: 'ok',
+              attestationHash: result.attestationHash,
+              metadata: { devMode: false, skipOnChain: false },
+            })
+          );
+
+          return response;
         }
 
-        // 5. Audit success
+        // 5. DEV MODE: SKIP_ONCHAIN is true -> do NOT touch the blockchain at all
+        fastify.log.warn(
+          '[SERVER] SKIP_ONCHAIN=1 -> skipping submitJobOnChain, anchorReceipt, verifyQuote'
+        );
+
+        const { answer, jobHash, attestation, model, usedStub } =
+          await inferenceEngine.infer(prompt, {
+            model: 'llama-3-8b-instruct',
+          });
+
+        const devResponse = {
+          jobId: '0',
+          attestationHash, // deterministic from prompt
+          txHash: '0x' + '0'.repeat(64),
+          receiptHash: null,
+          signingMode: 'server' as const,
+          artifactPreview: artifact,
+          enclaveDigest: null as string | null,
+          anchorTx: null as string | null,
+          modelOutput: {
+            text: answer,
+            model: model ?? 'llama-3-8b-instruct',
+            usedStub: usedStub ?? false,
+          },
+          jobHash,
+          attestation,
+          devMode: true,
+          skipOnChain: true,
+        };
+
+        if (idempotencyKey) {
+          await setIdempotentResult(idempotencyKey, devResponse);
+        }
+
         audit(
           createAuditEvent({
             request,
@@ -408,11 +528,12 @@ export async function jobRoutes(fastify: FastifyInstance) {
             mode: 'server',
             status: 200,
             result: 'ok',
-            attestationHash: result.attestationHash,
+            attestationHash,
+            metadata: { devMode: true, skipOnChain: true },
           })
         );
 
-        return response;
+        return devResponse;
       } catch (error) {
         const errMsg = (error as Error).message;
 

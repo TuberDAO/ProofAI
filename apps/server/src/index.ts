@@ -6,9 +6,11 @@ import path from 'path';
 import fs from 'fs';
 import { env } from './config/env.js';
 import { healthRoutes } from './routes/health.js';
-import { jobRoutes } from './routes/jobs.js';
+import { jobRoutes } from './routes/jobs';
 import { sessionRoutes } from './routes/sessions.js';
 import { redis } from './storage/redis.js';
+
+console.log('🚧 SKIP_ONCHAIN at boot:', process.env.SKIP_ONCHAIN);
 
 // Check if pino-pretty is available (only in dev with devDependencies)
 let usePrettyLogs = false;
@@ -109,6 +111,9 @@ fastify.register(healthRoutes);
 fastify.register(jobRoutes);
 fastify.register(sessionRoutes);
 
+// Log route registration for debugging
+console.log('[ROUTE-REG] jobRoutes registered (mode endpoint should return chainId 6343)');
+
 // Start server
 const start = async () => {
   try {
@@ -116,8 +121,10 @@ const start = async () => {
     await redis.ping();
     console.log('✅ Redis OK');
 
-    await fastify.listen({ port: env.port, host: '0.0.0.0' });
-    console.log(`\n🚀 Server running on http://localhost:${env.port}`);
+    const port = Number(process.env.PORT ?? '8080');
+    await fastify.listen({ port, host: '0.0.0.0' });
+    fastify.log.info(`Server listening on http://localhost:${port}`);
+    console.log(`\n🚀 Server running on http://localhost:${port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
